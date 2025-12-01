@@ -1,0 +1,35 @@
+{
+  "_format": "hh3-sol-build-info-1",
+  "id": "solc-0_8_28-a4173aaf135ef67bedfddb5218e73eeac4b3b25e",
+  "solcVersion": "0.8.28",
+  "solcLongVersion": "0.8.28+commit.7893614a",
+  "userSourceNameMap": {
+    "contracts/Raffle.sol": "project/contracts/Raffle.sol"
+  },
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "evmVersion": "cancun",
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "evm.bytecode",
+            "evm.deployedBytecode",
+            "evm.methodIdentifiers",
+            "metadata"
+          ]
+        }
+      },
+      "remappings": []
+    },
+    "sources": {
+      "project/contracts/Raffle.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.20;\n\ncontract Raffle {\n    address public owner;\n    address[] public players;\n    address public winner;\n    uint public entryFee;\n    uint public prizePool;\n    bool public isActive;\n    \n    // 히스토리 추적\n    struct RaffleRound {\n        address winner;\n        uint prizeAmount;\n        uint timestamp;\n        uint participantCount;\n    }\n    RaffleRound[] public raffleHistory;\n    \n    // 참가자별 참가 횟수 추적\n    mapping(address => uint) public entryCount;\n    \n    // 이벤트\n    event PlayerEntered(address indexed player, uint entryCount);\n    event WinnerPicked(address indexed winner, uint prizeAmount);\n    event RaffleReset(uint timestamp);\n    event EntryFeeChanged(uint newFee);\n    \n    modifier onlyOwner() {\n        require(msg.sender == owner, \"Only owner can call this\");\n        _;\n    }\n    \n    modifier raffleActive() {\n        require(isActive, \"Raffle is not active\");\n        _;\n    }\n    \n    constructor(uint _entryFee) {\n        owner = msg.sender;\n        entryFee = _entryFee;\n        isActive = true;\n    }\n    \n    // 참가비를 내고 래플 참가\n    function enter() public payable raffleActive {\n        require(msg.value == entryFee, \"Incorrect entry fee\");\n        \n        players.push(msg.sender);\n        entryCount[msg.sender]++;\n        prizePool += msg.value;\n        \n        emit PlayerEntered(msg.sender, entryCount[msg.sender]);\n    }\n    \n    // 여러 번 참가 (확률 높이기)\n    function enterMultiple(uint times) public payable raffleActive {\n        require(msg.value == entryFee * times, \"Incorrect total fee\");\n        require(times > 0 && times <= 10, \"Can enter 1-10 times\");\n        \n        for(uint i = 0; i < times; i++) {\n            players.push(msg.sender);\n        }\n        entryCount[msg.sender] += times;\n        prizePool += msg.value;\n        \n        emit PlayerEntered(msg.sender, entryCount[msg.sender]);\n    }\n    \n    // 당첨자 선정\n    function pickWinner() public onlyOwner raffleActive {\n        require(players.length > 0, \"No players\");\n        \n        uint rand = uint(\n            keccak256(\n                abi.encodePacked(block.timestamp, block.prevrandao, players.length)\n            )\n        );\n        uint index = rand % players.length;\n        winner = players[index];\n        \n        // 상금 지급\n        uint prize = prizePool;\n        prizePool = 0;\n        \n        // 히스토리 저장\n        raffleHistory.push(RaffleRound({\n            winner: winner,\n            prizeAmount: prize,\n            timestamp: block.timestamp,\n            participantCount: players.length\n        }));\n        \n        // 상금 전송\n        (bool success, ) = winner.call{value: prize}(\"\");\n        require(success, \"Transfer failed\");\n        \n        emit WinnerPicked(winner, prize);\n        \n        // 자동 리셋\n        resetRaffle();\n    }\n    \n    // 래플 리셋\n    function resetRaffle() public onlyOwner {\n        delete players;\n        winner = address(0);\n        \n        emit RaffleReset(block.timestamp);\n    }\n    \n    // 참가비 변경\n    function setEntryFee(uint _newFee) public onlyOwner {\n        entryFee = _newFee;\n        emit EntryFeeChanged(_newFee);\n    }\n    \n    // 래플 활성화/비활성화\n    function toggleRaffle() public onlyOwner {\n        isActive = !isActive;\n    }\n    \n    // 긴급 상황시 자금 회수 (참가자가 없을 때만)\n    function emergencyWithdraw() public onlyOwner {\n        require(players.length == 0, \"Cannot withdraw with active players\");\n        \n        uint balance = address(this).balance;\n        (bool success, ) = owner.call{value: balance}(\"\");\n        require(success, \"Transfer failed\");\n    }\n    \n    // View 함수들\n    function getPlayers() public view returns (address[] memory) {\n        return players;\n    }\n    \n    function getPlayerCount() public view returns (uint) {\n        return players.length;\n    }\n    \n    function getPrizePool() public view returns (uint) {\n        return prizePool;\n    }\n    \n    function getMyEntryCount() public view returns (uint) {\n        return entryCount[msg.sender];\n    }\n    \n    function getRaffleHistory() public view returns (RaffleRound[] memory) {\n        return raffleHistory;\n    }\n    \n    function getLatestWinner() public view returns (address, uint, uint) {\n        require(raffleHistory.length > 0, \"No raffle history\");\n        RaffleRound memory latest = raffleHistory[raffleHistory.length - 1];\n        return (latest.winner, latest.prizeAmount, latest.timestamp);\n    }\n    \n    // 특정 주소의 당첨 횟수\n    function getWinCount(address player) public view returns (uint) {\n        uint count = 0;\n        for(uint i = 0; i < raffleHistory.length; i++) {\n            if(raffleHistory[i].winner == player) {\n                count++;\n            }\n        }\n        return count;\n    }\n}"
+      }
+    }
+  }
+}

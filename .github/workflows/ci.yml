@@ -1,0 +1,29 @@
+name: Hardhat CI
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    env:
+      ARBITRUM_SEPOLIA_PRIVATE_KEY: ${{ secrets.ARBITRUM_SEPOLIA_PRIVATE_KEY }}
+      ARBITRUM_SEPOLIA_RPC_URL: ${{ secrets.ARBITRUM_SEPOLIA_RPC_URL }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Hardhat compile
+        run: npx hardhat compile
+
+      - name: Hardhat test
+        run: npx hardhat test
